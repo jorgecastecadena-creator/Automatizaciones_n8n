@@ -1,0 +1,310 @@
+{
+  "name": "Evaluacion_Adopcion",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "documentId": {
+          "__rl": true,
+          "value": "1SBcp3mV4WyDphqA8nnNkTnfPOD2gckwuUlheiIYLNq0",
+          "mode": "list",
+          "cachedResultName": "Formulario sin título (respuestas)",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1SBcp3mV4WyDphqA8nnNkTnfPOD2gckwuUlheiIYLNq0/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 680457354,
+          "mode": "list",
+          "cachedResultName": "Respuestas de formulario 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1SBcp3mV4WyDphqA8nnNkTnfPOD2gckwuUlheiIYLNq0/edit#gid=680457354"
+        },
+        "event": "rowAdded",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTrigger",
+      "typeVersion": 1,
+      "position": [
+        -288,
+        -16
+      ],
+      "id": "f48f9e9b-0bb3-49aa-b203-c538f680f96d",
+      "name": "Google Sheets Trigger",
+      "credentials": {
+        "googleSheetsTriggerOAuth2Api": {
+          "id": "aKhOq06240gJfFeW",
+          "name": "Google Sheets Trigger account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1f92isWAlKqCmErHnFLJpCXXVYcM_SqDQDwM8F_eQaxo",
+          "mode": "list",
+          "cachedResultName": "Catalogo /Reglas Adopcion n8n",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1f92isWAlKqCmErHnFLJpCXXVYcM_SqDQDwM8F_eQaxo/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Hoja 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1f92isWAlKqCmErHnFLJpCXXVYcM_SqDQDwM8F_eQaxo/edit#gid=0"
+        },
+        "filtersUI": {
+          "values": []
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -128,
+        -16
+      ],
+      "id": "edc43332-3b0d-43f1-977e-b0cd901d0484",
+      "name": "Get row(s) in sheet",
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "p2JzrPSsQRXEmxKb",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Obtener respuestas del formulario (Trigger)\nconst respuestasForm = $(\"Google Sheets Trigger\").last().json;\n\nfunction extraerNumero(valor) {\n  if (typeof valor === 'number') return valor;\n  if (!valor) return 0;\n  const match = String(valor).match(/\\d+/);\n  return match ? parseFloat(match[0]) : 0;\n}\n\nlet presupuestoRaw = 0;\nlet tiempoRaw = 0;\n\n// Buscar dinámicamente las claves de tiempo y presupuesto\nfor (const [key, value] of Object.entries(respuestasForm)) {\n  const keyLower = key.toLowerCase();\n  if (keyLower.includes('presupuesto')) {\n    presupuestoRaw = value;\n  } else if (keyLower.includes('tiempo')) {\n    tiempoRaw = value;\n  }\n}\n\nconst presupuestoUsuario = extraerNumero(presupuestoRaw);\nconst tiempoUsuario = extraerNumero(tiempoRaw);\n\nconst nombreUsuario = respuestasForm[\"Nombre_adoptante\"] || respuestasForm[\"Nombre completo\"] || respuestasForm[\"Nombre\"] || \"Adoptante\";\nconst emailUsuario = respuestasForm[\"Correo_adoptante\"] || respuestasForm[\"Correo electrónico\"] || respuestasForm[\"Correo\"];\n\n// 2. Obtener catálogo y ELIMINAR DUPLICADOS por ID_Mascota exacto de Google Sheets\nconst itemsRaw = $(\"Get row(s) in sheet\").all().map(item => item.json);\nconst todasLasMascotas = Array.from(\n  new Map(itemsRaw.map(pet => [pet.ID_Mascota, pet])).values()\n);\n\n// 3. Filtrar mascotas según criterios\nconst mascotasCompatibles = todasLasMascotas.filter(pet => {\n  const costoPet = extraerNumero(pet.Presupuesto_Mensual_BS);\n  const tiempoPet = extraerNumero(pet.Tiempo_Diario_Min);\n  return costoPet <= presupuestoUsuario && tiempoPet <= tiempoUsuario;\n});\n\nlet htmlCards = \"\";\nlet nombresArray = [];\n\nif (mascotasCompatibles.length > 0) {\n  mascotasCompatibles.forEach(pet => {\n    nombresArray.push(pet.Nombre);\n    htmlCards += `\n      <div style=\"border: 1px solid #e0e0e0; border-radius: 8px; padding: 14px; margin-bottom: 12px; background-color: #ffffff;\">\n        <h3 style=\"color: #1a5276; margin-top: 0; margin-bottom: 8px;\">🐾 ${pet.Nombre} (${pet.Especie})</h3>\n        <p style=\"margin: 4px 0; color: #444;\"><b>Nivel de energía:</b> ${pet.Nivel_Energia}</p>\n        <p style=\"margin: 4px 0; color: #444;\"><b>Costo estimado mensual:</b> ${pet.Presupuesto_Mensual_BS} BS</p>\n        <p style=\"margin: 4px 0; color: #444;\"><b>Tiempo diario de paseo:</b> ${pet.Tiempo_Diario_Min} min/día</p>\n        <p style=\"margin: 8px 0 0 0; color: #666; font-style: italic;\">\"${pet.Perfil_Ideal}\"</p>\n      </div>`;\n  });\n}\n\n// Devuelve las variables procesadas\nreturn {\n  json: {\n    nombreUsuario: nombreUsuario,\n    emailUsuario: emailUsuario,\n    presupuestoUsuario: presupuestoUsuario,\n    tiempoUsuario: tiempoUsuario,\n    tieneMatch: mascotasCompatibles.length > 0,\n    cantidadMatches: mascotasCompatibles.length,\n    nombresMascotas: nombresArray.join(\", \"),\n    htmlMascotas: htmlCards\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        48,
+        -16
+      ],
+      "id": "0530f241-209e-4173-887d-29038afad58c",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "d0887c57-64af-4cc8-bfdd-9a328b1ce003",
+              "leftValue": "={{ $json.tieneMatch }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        224,
+        -16
+      ],
+      "id": "8e95a94a-2aba-4f3d-a558-8f66c4e7dd43",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Code in JavaScript').item.json.emailUsuario }}",
+        "subject": "Descubre las mascotas indicadas para ti, ¡Hiciste Match! ",
+        "message": "=<div style=\"font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;\">\n  <h2 style=\"color: #1a5276; margin-top: 0;\">¡Hola, {{ $json.nombreUsuario }}! 🐶🐱</h2>\n  \n  <p>Gracias por completar nuestro test de adopción responsable. Evaluando tus respuestas, confirmamos que dispones de <b>{{ $json.tiempoUsuario }} minutos diarios</b> y un presupuesto estimado de <b>{{ $json.presupuestoUsuario }} BS/mes</b>.</p>\n  \n  <hr style=\"border: 0; border-top: 1px solid #ccc; margin: 20px 0;\" />\n  \n  <h3 style=\"color: #27ae60;\">🎯 Mascotas que se ajustan al 100% a tu perfil:</h3>\n  <p>Según nuestro catálogo, las siguientes mascotas son las indicadas para integrarse perfectamente a tu ritmo de vida:</p>\n  \n  {{ $json.htmlMascotas }}\n  \n  <div style=\"background-color: #eaf2f8; padding: 15px; border-left: 4px solid #2980b9; margin-top: 20px; border-radius: 4px;\">\n    <p style=\"margin: 0; font-size: 13px; color: #1a5276;\"><b>¿Por qué es importante esta selección?</b><br>Adoptar una mascota adaptada a tu disponibilidad real evita sobrecostos económicos y garantiza que reciba la atención y paseos necesarios para su bienestar.</p>\n  </div>\n  \n  <p style=\"margin-top: 25px;\">Si estás listo/a para conocer a <b>{{ $json.nombresMascotas }}</b>, responde directamente a este correo o agenda tu visita en el botón de abajo.</p>\n</div>\n\n<div style=\"text-align: center; margin: 30px 0; padding: 20px; background-color: #f8f9fa; border: 1px dashed #27ae60; border-radius: 8px;\">\n  <h3 style=\"color: #2c3e50; margin-top: 0;\">📅 Agenda tu cita de adopción</h3>\n  <p style=\"color: #555; margin-bottom: 20px;\">\n    ¡Elegí el momento que mejor se adapte a tu agenda! Atendemos de <b>Lunes a Viernes</b> en nuestros horarios disponibles.\n  </p>\n  \n  <a href=\"https://calendar.app.google/wTRdeV3mHJfRiWTr9\" target=\"_blank\" style=\"background-color: #27ae60; color: #ffffff; padding: 14px 28px; text-decoration: none; font-weight: bold; border-radius: 6px; display: inline-block; font-size: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);\">\n    👉 Seleccionar Día y Hora en el Calendario\n  </a>\n</div>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        416,
+        -208
+      ],
+      "id": "04113346-ce46-413c-852a-ee776262f181",
+      "name": "Send a message",
+      "webhookId": "2b7ffa7a-9516-43b2-af0d-da8f3bb02efa",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "gv1doqnP7yVJQgHV",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Code in JavaScript').item.json.emailUsuario }}",
+        "subject": "={{ $('Code in JavaScript').item.json.nombreUsuario }}, gracias por postular a la adopción.",
+        "message": "=<div style=\"font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;\">\n  <h2 style=\"color: #1a5276; margin-top: 0;\">¡Hola, {{ $json.nombreUsuario }}! 🐶🐱</h2>\n  \n  <p>Queremos agradecerte sinceramente por completar nuestro test de adopción responsable y por tu interés en darle un hogar a uno de nuestros rescatados.</p>\n  \n  <p>En base a tus respuestas, registramos que cuentas con <b>{{ $json.tiempoUsuario }} minutos diarios</b> y un presupuesto estimado de <b>{{ $json.presupuestoUsuario }} BS/mes</b>.</p>\n  \n  <div style=\"background-color: #fef9e7; padding: 18px; border-left: 4px solid #f39c12; margin: 20px 0; border-radius: 4px;\">\n    <h3 style=\"color: #d35400; margin-top: 0; font-size: 16px;\">📌 Estado de tu solicitud:</h3>\n    <p style=\"margin: 0; font-size: 14px; color: #7f8c8d;\">\n      Por el momento, <b>ninguna de las mascotas que tenemos en adopción inmediata se ajusta al 100%</b> a los rangos de tiempo o presupuesto que ingresaste. \n    </p>\n  </div>\n\n  <p>Para nosotros es primordial garantizar que tanto tú como el animalito tengan la mejor experiencia posible, evitando situaciones de estrés por falta de tiempo o gastos imprevistos.</p>\n\n  <hr style=\"border: 0; border-top: 1px solid #ccc; margin: 25px 0;\" />\n\n  <h3 style=\"color: #1a5276;\">💡 ¿Qué hacemos ahora?</h3>\n  <ul style=\"line-height: 1.6; color: #555;\">\n    <li><b>Guardamos tu perfil:</b> Conservaremos tus datos para avisarte de inmediato cuando ingrese un perrito o gatito que haga <i>match</i> con tus posibilidades.</li>\n    <li><b>Evaluación personalizada:</b> Si crees que puedes flexibilizar tus tiempos o quieres orientación sobre cuál opción podría adaptarse mejor a ti, responde directamente a este correo para conversar con nuestro equipo.</li>\n  </ul>\n\n  <p style=\"margin-top: 25px; text-align: center; color: #7f8c8d; font-size: 13px;\">\n    ¡Gracias por tu responsabilidad y compromiso con la adopción consciente! ❤️\n  </p>\n</div>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        416,
+        160
+      ],
+      "id": "7cd85ec9-c95d-40f8-ba75-afe8bac66721",
+      "name": "Send a message1",
+      "webhookId": "e9468c26-84ef-4dd5-b1a4-2fe1ecd59931",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "gv1doqnP7yVJQgHV",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        608,
+        -16
+      ],
+      "id": "2e6dbf23-33d2-4263-92c6-2de261774faa",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "resource": "dataset",
+        "operation": "refresh",
+        "groupId": "me",
+        "datasetId": "66e8413f-c5ea-42b3-82d2-db7f7e137460"
+      },
+      "type": "n8n-nodes-powerbi.powerBi",
+      "typeVersion": 1,
+      "position": [
+        800,
+        -16
+      ],
+      "id": "cebcb1f5-a883-4a8b-ad86-2728c6444b74",
+      "name": "Refresh a dataset",
+      "credentials": {
+        "powerBiApiOAuth2Api": {
+          "id": "yQErMOynzWG0zIYu",
+          "name": "Power BI account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Google Sheets Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message1": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Refresh a dataset",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "d38b7b92-81e8-4fda-a604-7856235b42d1",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "c77217cb498315e4fb2b28c91baa8c91ef08fb4940cd4e4c81f5aa9920ec50d4"
+  },
+  "nodeGroups": [],
+  "id": "WStfY7TBITJUM0Kd",
+  "tags": []
+}
